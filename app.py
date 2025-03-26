@@ -6,7 +6,8 @@ import time
 app = Flask(__name__)
 
 # Configura a chave API da OpenAI com sua chave
-client = OpenAI(api_key="SUA_CHAVE_API_AQUI")
+import os
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Prompt detalhado da Camila
 prompt_camila = """
 Você é Camila, uma jurista experiente em Direito Previdenciário para professores brasileiros. 

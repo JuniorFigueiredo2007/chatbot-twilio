@@ -3,11 +3,17 @@ from twilio.twiml.messaging_response import MessagingResponse
 from openai import OpenAI
 import time
 import os
+from twilio.rest import Client as TwilioClient
 
 app = Flask(__name__)
 
 # Configura o cliente OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Configura o cliente Twilio
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 # ID do Assistente (Camila)
 ASSISTANT_ID = "asst_mlwRF5BYw4b4gyl2jVtlwV"
@@ -15,6 +21,10 @@ ASSISTANT_ID = "asst_mlwRF5BYw4b4gyl2jVtlwV"
 # Dicionário para rastrear tempos de última interação e threads por usuário
 ultima_interacao = {}
 user_threads = {}
+
+# Número para encaminhar SMS (seu número pessoal)
+FORWARD_TO_NUMBER = "+5598991472030"
+TWILIO_NUMBER = "+19523146907"  # Número Twilio
 
 @app.route('/whatsapp', methods=['POST'])
 def whatsapp_reply():
@@ -62,6 +72,23 @@ def whatsapp_reply():
     msg = resp.message()
     msg.body(resposta_ia)
 
+    return str(resp)
+
+@app.route('/sms', methods=['POST'])
+def sms_forward():
+    # Recebe o SMS do Twilio
+    sender = request.form.get('From')
+    message_body = request.form.get('Body', '').strip()
+
+    # Encaminha o SMS para o número pessoal
+    message = twilio_client.messages.create(
+        body=f"SMS de {sender}: {message_body}",
+        from_=TWILIO_NUMBER,
+        to=FORWARD_TO_NUMBER
+    )
+
+    # Responde ao Twilio (necessário para o webhook)
+    resp = MessagingResponse()
     return str(resp)
 
 if __name__ == "__main__":

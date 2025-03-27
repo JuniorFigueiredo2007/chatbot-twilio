@@ -15,8 +15,8 @@ TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
-# ID do Assistente (Camila)
-ASSISTANT_ID = "asst_mlwRF5BYw4b4gyl2jVtlwV"
+# ID atualizado do Assistente (Camila)
+ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 
 # Dicionário para rastrear tempos de última interação e threads por usuário
 ultima_interacao = {}

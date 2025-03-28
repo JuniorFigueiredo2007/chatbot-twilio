@@ -1,42 +1,59 @@
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 from openai import OpenAI
-import time
+import requests
 import os
+import time
 from twilio.rest import Client as TwilioClient
 
 app = Flask(__name__)
 
-# Configuração CORRETA com o header Assistants API v2
+# Configuração do OpenAI Client com suporte à Assistants API v2
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     default_headers={"OpenAI-Beta": "assistants=v2"}
 )
 
-# Configuração do Twilio
+# Cliente Twilio
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
-# Assistente Camila atualizado
 ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 
 ultima_interacao = {}
 user_threads = {}
 
-FORWARD_TO_NUMBER = "+5598991472030"
-TWILIO_NUMBER = "+19523146907"
-
 @app.route('/bot', methods=['POST'])
 def whatsapp_reply():
     sender = request.form.get('From')
     incoming_msg = request.form.get('Body', '').strip()
+    num_media = int(request.form.get('NumMedia', 0))
 
     if 'g.us' in sender:
         return ''
 
     agora = time.time()
     ultima_interacao[sender] = agora
+
+    # Transcrição do áudio (se houver)
+    if num_media > 0:
+        media_type = request.form.get('MediaContentType0')
+        if 'audio' in media_type or 'ogg' in media_type:
+            audio_url = request.form.get('MediaUrl0')
+            audio_file = requests.get(audio_url, auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN))
+
+            with open('/tmp/audio.mp3', 'wb') as f:
+                f.write(audio_file.content)
+
+            # Usando Whisper da OpenAI
+            with open('/tmp/audio.mp3', 'rb') as audio:
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio,
+                    response_format='text'
+                )
+                incoming_msg = transcript.strip()
 
     if sender not in user_threads:
         thread = client.beta.threads.create()
@@ -79,8 +96,8 @@ def sms_forward():
 
     twilio_client.messages.create(
         body=f"SMS de {sender}: {message_body}",
-        from_=TWILIO_NUMBER,
-        to=FORWARD_TO_NUMBER
+        from_=os.getenv("TWILIO_NUMBER"),
+        to=os.getenv("FORWARD_TO_NUMBER")
     )
 
     resp = MessagingResponse()

@@ -6,7 +6,10 @@ import os
 from twilio.rest import Client as TwilioClient
 import requests
 from io import BytesIO
-import tempfile
+from PIL import Image
+import fitz  # PyMuPDF para PDFs
+from docx import Document  # Para Word
+import openpyxl  # Para Excel
 
 app = Flask(__name__)
 
@@ -26,6 +29,26 @@ ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 ultima_interacao = {}
 user_threads = {}
 
+def extrair_texto_pdf(conteudo):
+    pdf_documento = fitz.open(stream=conteudo, filetype="pdf")
+    texto = ""
+    for pagina in pdf_documento:
+        texto += pagina.get_text()
+    return texto.strip()
+
+def extrair_texto_word(conteudo):
+    documento = Document(BytesIO(conteudo))
+    return "\n".join([paragrafo.text for paragrafo in documento.paragraphs])
+
+def extrair_texto_excel(conteudo):
+    workbook = openpyxl.load_workbook(BytesIO(conteudo), data_only=True)
+    sheet = workbook.active
+    texto = ""
+    for row in sheet.iter_rows(values_only=True):
+        linha = [str(cell) for cell in row if cell is not None]
+        texto += ' '.join(linha) + '\n'
+    return texto.strip()
+
 @app.route('/bot', methods=['POST'])
 def whatsapp_reply():
     sender = request.form.get('From')
@@ -44,43 +67,36 @@ def whatsapp_reply():
 
     thread_id = user_threads[sender]
 
-    content = [{"type": "text", "text": incoming_msg}]
-
     if num_media > 0:
         media_url = request.form.get('MediaUrl0')
         content_type = request.form.get('MediaContentType0')
 
+        response = requests.get(media_url, auth=(
+            os.getenv("TWILIO_ACCOUNT_SID"), 
+            os.getenv("TWILIO_AUTH_TOKEN"))
+        )
+
         if 'image' in content_type:
-            response = requests.get(media_url, auth=(
-                os.getenv("TWILIO_ACCOUNT_SID"),
-                os.getenv("TWILIO_AUTH_TOKEN"))
-            )
+            img = Image.open(BytesIO(response.content))
+            texto_extraido = pytesseract.image_to_string(img)
+            incoming_msg = f"O cliente enviou uma imagem com o seguinte texto: {texto_extraido}"
 
-            # Determina a extensão correta da imagem
-            file_extension = content_type.split('/')[-1]
+        elif 'pdf' in content_type:
+            texto_extraido = extrair_texto_pdf(response.content)
+            incoming_msg = f"O cliente enviou um PDF com o seguinte texto: {texto_extraido}"
 
-            with tempfile.NamedTemporaryFile(suffix=f".{file_extension}") as temp_image:
-                temp_image.write(response.content)
-                temp_image.flush()
+        elif 'msword' in content_type or 'wordprocessingml' in content_type:
+            texto_extraido = extrair_texto_word(response.content)
+            incoming_msg = f"O cliente enviou um documento Word com o seguinte texto: {texto_extraido}"
 
-                # Faz upload da imagem para o OpenAI corretamente
-                image_upload = client.files.create(
-                    file=open(temp_image.name, "rb"),
-                    purpose="vision"
-                )
+        elif 'sheet' in content_type or 'spreadsheetml' in content_type:
+            texto_extraido = extrair_texto_excel(response.content)
+            incoming_msg = f"O cliente enviou um Excel com o seguinte texto: {texto_extraido}"
 
-            image_file_id = image_upload.id
-
-            content.append({
-                "type": "image_file",
-                "image_file": {"file_id": image_file_id}
-            })
-
-    # Enviar mensagem com texto e imagem (se existir)
     client.beta.threads.messages.create(
         thread_id=thread_id,
         role="user",
-        content=content
+        content=incoming_msg
     )
 
     run = client.beta.threads.runs.create(

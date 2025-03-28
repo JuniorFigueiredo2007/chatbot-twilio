@@ -7,3 +7,6 @@ pydantic==1.10.14
 requests==2.32.3
 pytesseract==0.3.10
 Pillow==10.3.0
+PyMuPDF==1.23.26
+python-docx==1.1.2
+openpyxl==3.1.2

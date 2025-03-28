@@ -139,19 +139,9 @@ def processar_em_background(sender, incoming_msg, num_media, request_form):
 
 @app.route('/bot', methods=['POST'])
 def whatsapp_reply():
-    print("📩 Requisição recebida no /bot — resposta imediata")
+    print("🛠 CHEGOU ALGO NO /bot")
+    raise Exception("Forçando erro para teste")
 
-    sender = request.form.get('From')
-    incoming_msg = request.form.get('Body', '').strip()
-    num_media = int(request.form.get('NumMedia', 0))
-
-    # Inicia o processamento em background
-    threading.Thread(target=processar_em_background, args=(sender, incoming_msg, num_media, request.form)).start()
-
-    # Resposta imediata ao Twilio
-    resposta = MessagingResponse()
-    resposta.message("Recebi sua imagem! Estou analisando e te respondo em instantes.")
-    return Response(str(resposta), mimetype='text/xml')
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

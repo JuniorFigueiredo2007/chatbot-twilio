@@ -5,22 +5,14 @@ import time
 import os
 from twilio.rest import Client as TwilioClient
 import requests
-from io import BytesIO
-from PIL import Image
-import pytesseract
 
 app = Flask(__name__)
 
-# Clientes
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    default_headers={"OpenAI-Beta": "assistants=v2"}
-)
+# Cliente OpenAI com GPT-4 Vision habilitado
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), default_headers={"OpenAI-Beta": "assistants=v2"})
 
-twilio_client = TwilioClient(
-    os.getenv("TWILIO_ACCOUNT_SID"),
-    os.getenv("TWILIO_AUTH_TOKEN")
-)
+# Cliente Twilio
+twilio_client = TwilioClient(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
 
 ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 
@@ -50,20 +42,21 @@ def whatsapp_reply():
         content_type = request.form.get('MediaContentType0')
 
         if 'image' in content_type:
-            response = requests.get(media_url, auth=(
-                os.getenv("TWILIO_ACCOUNT_SID"), 
-                os.getenv("TWILIO_AUTH_TOKEN"))
+            incoming_msg = "O cliente enviou uma imagem, por favor analise e responda adequadamente."
+            
+            client.beta.threads.messages.create(
+                thread_id=thread_id,
+                role="user",
+                content=[
+                    {"type": "text", "text": incoming_msg},
+                    {"type": "image_url", "image_url": {"url": media_url}}
+                ]
             )
-            img = Image.open(BytesIO(response.content))
-            texto_extraido = pytesseract.image_to_string(img)
-
-            incoming_msg = f"O cliente enviou uma imagem com o seguinte texto: {texto_extraido}"
-
-    client.beta.threads.messages.create(
-        thread_id=thread_id,
-        role="user",
-        content=incoming_msg
-    )
+        else:
+            incoming_msg = "O cliente enviou um arquivo que não consigo interpretar. Informe-o por favor."
+            client.beta.threads.messages.create(thread_id=thread_id, role="user", content=incoming_msg)
+    else:
+        client.beta.threads.messages.create(thread_id=thread_id, role="user", content=incoming_msg)
 
     run = client.beta.threads.runs.create(
         thread_id=thread_id,

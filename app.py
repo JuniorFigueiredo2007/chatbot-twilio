@@ -7,13 +7,13 @@ from twilio.rest import Client as TwilioClient
 
 app = Flask(__name__)
 
-# Configuração correta do cliente OpenAI com suporte à Assistants API v2
+# Inicialização correta do cliente OpenAI com suporte ao Assistants API v2
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     default_headers={"OpenAI-Beta": "assistants=v2"}
 )
 
-# Configuração do cliente Twilio
+# Configura o cliente Twilio
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)

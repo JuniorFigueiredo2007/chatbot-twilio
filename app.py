@@ -5,6 +5,8 @@ import time
 import os
 from twilio.rest import Client as TwilioClient
 import requests
+from io import BytesIO
+import tempfile
 
 app = Flask(__name__)
 
@@ -50,15 +52,22 @@ def whatsapp_reply():
 
         if 'image' in content_type:
             response = requests.get(media_url, auth=(
-                os.getenv("TWILIO_ACCOUNT_SID"), 
+                os.getenv("TWILIO_ACCOUNT_SID"),
                 os.getenv("TWILIO_AUTH_TOKEN"))
             )
 
-            # Upload direto para OpenAI
-            image_upload = client.files.create(
-                file=response.content,
-                purpose="vision"
-            )
+            # Determina a extensão correta da imagem
+            file_extension = content_type.split('/')[-1]
+
+            with tempfile.NamedTemporaryFile(suffix=f".{file_extension}") as temp_image:
+                temp_image.write(response.content)
+                temp_image.flush()
+
+                # Faz upload da imagem para o OpenAI corretamente
+                image_upload = client.files.create(
+                    file=open(temp_image.name, "rb"),
+                    purpose="vision"
+                )
 
             image_file_id = image_upload.id
 

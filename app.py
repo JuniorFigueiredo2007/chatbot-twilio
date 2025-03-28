@@ -7,8 +7,11 @@ from twilio.rest import Client as TwilioClient
 
 app = Flask(__name__)
 
-# Configura o cliente OpenAI
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Configura o cliente OpenAI com o header para a Assistants API v2
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    default_headers={"OpenAI-Beta": "assistants=v2"}
+)
 
 # Configura o cliente Twilio
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
@@ -26,7 +29,7 @@ user_threads = {}
 FORWARD_TO_NUMBER = "+5598991472030"
 TWILIO_NUMBER = "+19523146907"
 
-@app.route('/bot', methods=['POST']) # <== Esta linha corrigida agora corretamente.
+@app.route('/bot', methods=['POST'])
 def whatsapp_reply():
     sender = request.form.get('From')
     incoming_msg = request.form.get('Body', '').strip()
@@ -87,4 +90,3 @@ def sms_forward():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-

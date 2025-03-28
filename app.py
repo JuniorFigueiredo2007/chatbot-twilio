@@ -4,27 +4,28 @@ from openai import OpenAI
 import time
 import os
 from twilio.rest import Client as TwilioClient
-import pytesseract
-from PIL import Image
 import requests
 from io import BytesIO
+from PIL import Image
+import pytesseract
 
 app = Flask(__name__)
 
-# Clientes OpenAI e Twilio configurados corretamente
+# Clientes
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     default_headers={"OpenAI-Beta": "assistants=v2"}
 )
 
-twilio_client = TwilioClient(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
+twilio_client = TwilioClient(
+    os.getenv("TWILIO_ACCOUNT_SID"),
+    os.getenv("TWILIO_AUTH_TOKEN")
+)
 
-# ID do Assistente Camila
 ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 
-# Dicionários para threads e última interação
-user_threads = {}
 ultima_interacao = {}
+user_threads = {}
 
 @app.route('/bot', methods=['POST'])
 def whatsapp_reply():
@@ -35,18 +36,6 @@ def whatsapp_reply():
     if 'g.us' in sender:
         return ''
 
-    # Simulando digitação humana (pequena pausa)
-    time.sleep(2)
-
-    if num_media > 0:
-        media_url = request.form.get('MediaUrl0')
-        media_type = request.form.get('MediaContentType0')
-
-        if 'image' in media_type:
-            response = requests.get(media_url)
-            img = Image.open(BytesIO(response.content))
-            incoming_msg = pytesseract.image_to_string(img).strip()
-
     agora = time.time()
     ultima_interacao[sender] = agora
 
@@ -55,6 +44,20 @@ def whatsapp_reply():
         user_threads[sender] = thread.id
 
     thread_id = user_threads[sender]
+
+    if num_media > 0:
+        media_url = request.form.get('MediaUrl0')
+        content_type = request.form.get('MediaContentType0')
+
+        if 'image' in content_type:
+            response = requests.get(media_url, auth=(
+                os.getenv("TWILIO_ACCOUNT_SID"), 
+                os.getenv("TWILIO_AUTH_TOKEN"))
+            )
+            img = Image.open(BytesIO(response.content))
+            texto_extraido = pytesseract.image_to_string(img)
+
+            incoming_msg = f"O cliente enviou uma imagem com o seguinte texto: {texto_extraido}"
 
     client.beta.threads.messages.create(
         thread_id=thread_id,

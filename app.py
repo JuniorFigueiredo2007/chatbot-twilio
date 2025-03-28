@@ -62,86 +62,99 @@ def extrair_texto_excel(conteudo):
         texto += ' '.join(linha) + '\n'
     return texto.strip()
 
-# Processamento assíncrono em segundo plano
+# Processamento em segundo plano
 def processar_em_background(sender, incoming_msg, num_media, request_form):
-    if 'g.us' in sender:
-        return
+    try:
+        if 'g.us' in sender:
+            return
 
-    agora = time.time()
-    ultima_interacao[sender] = agora
+        agora = time.time()
+        ultima_interacao[sender] = agora
 
-    if sender not in sheet.col_values(1):
-        sheet.append_row([sender, datetime.now().strftime("%d/%m/%Y %H:%M:%S")])
+        if sender not in sheet.col_values(1):
+            sheet.append_row([sender, datetime.now().strftime("%d/%m/%Y %H:%M:%S")])
 
-    if sender not in user_threads:
-        thread = client.beta.threads.create()
-        user_threads[sender] = thread.id
+        if sender not in user_threads:
+            thread = client.beta.threads.create()
+            user_threads[sender] = thread.id
 
-    thread_id = user_threads[sender]
+        thread_id = user_threads[sender]
 
-    if num_media > 0:
-        media_url = request_form.get('MediaUrl0')
-        content_type = request_form.get('MediaContentType0')
+        if num_media > 0:
+            media_url = request_form.get('MediaUrl0')
+            content_type = request_form.get('MediaContentType0')
 
-        response = requests.get(media_url, auth=(
-            os.getenv("TWILIO_ACCOUNT_SID"),
-            os.getenv("TWILIO_AUTH_TOKEN"))
-        )
-        conteudo = response.content
+            response = requests.get(media_url, auth=(
+                os.getenv("TWILIO_ACCOUNT_SID"),
+                os.getenv("TWILIO_AUTH_TOKEN"))
+            )
+            conteudo = response.content
 
-        if 'image' in content_type:
-            content = [
-                {"type": "image_url", "image_url": {"url": media_url + ".jpg"}},
-                {"type": "text", "text": incoming_msg or "Descreva o conteúdo dessa imagem."}
-            ]
-        elif 'pdf' in content_type:
-            texto = extrair_texto_pdf(conteudo)
-            content = f"O cliente enviou um PDF com o seguinte texto: {texto}"
-        elif 'word' in content_type:
-            texto = extrair_texto_word(conteudo)
-            content = f"O cliente enviou um documento Word com o seguinte texto: {texto}"
-        elif 'sheet' in content_type:
-            texto = extrair_texto_excel(conteudo)
-            content = f"O cliente enviou uma planilha com o seguinte texto: {texto}"
+            if 'image' in content_type:
+                content = [
+                    {"type": "image_url", "image_url": {"url": media_url + ".jpg"}},
+                    {"type": "text", "text": incoming_msg or "Descreva o conteúdo dessa imagem."}
+                ]
+            elif 'pdf' in content_type:
+                texto = extrair_texto_pdf(conteudo)
+                content = f"O cliente enviou um PDF com o seguinte texto: {texto}"
+            elif 'word' in content_type:
+                texto = extrair_texto_word(conteudo)
+                content = f"O cliente enviou um documento Word com o seguinte texto: {texto}"
+            elif 'sheet' in content_type:
+                texto = extrair_texto_excel(conteudo)
+                content = f"O cliente enviou uma planilha com o seguinte texto: {texto}"
+            else:
+                content = "Recebemos a mídia, mas não conseguimos processá-la."
+
+            client.beta.threads.messages.create(
+                thread_id=thread_id,
+                role="user",
+                content=content
+            )
         else:
-            content = "Recebemos a mídia, mas não conseguimos processá-la."
+            client.beta.threads.messages.create(
+                thread_id=thread_id,
+                role="user",
+                content=incoming_msg
+            )
 
-        client.beta.threads.messages.create(
-            thread_id=thread_id,
-            role="user",
-            content=content
+        run = client.beta.threads.runs.create(thread_id=thread_id, assistant_id=ASSISTANT_ID)
+
+        while run.status != "completed":
+            time.sleep(1)
+            run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+
+        messages = client.beta.threads.messages.list(thread_id=thread_id)
+        if messages.data:
+            resposta_ia = messages.data[0].content[0].text.value.strip()
+        else:
+            resposta_ia = "Desculpe, não consegui gerar uma resposta."
+
+        # Envia a resposta final via Twilio
+        twilio_client.messages.create(
+            from_="whatsapp:" + os.getenv("TWILIO_PHONE_NUMBER"),
+            to=sender,
+            body=resposta_ia
         )
-    else:
-        client.beta.threads.messages.create(
-            thread_id=thread_id,
-            role="user",
-            content=incoming_msg
-        )
 
-    run = client.beta.threads.runs.create(thread_id=thread_id, assistant_id=ASSISTANT_ID)
+    except Exception as e:
+        print("❌ Erro no processamento em background:", e)
 
-    while run.status != "completed":
-        time.sleep(1)
-        run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
-
-    messages = client.beta.threads.messages.list(thread_id=thread_id)
-    if messages.data:
-        resposta_ia = messages.data[0].content[0].text.value.strip()
-    else:
-        resposta_ia = "Desculpe, não consegui gerar uma resposta."
-
-    # Envia a resposta final ao usuário via API do Twilio
-    twilio_client.messages.create(
-        from_="whatsapp:" + os.getenv("TWILIO_PHONE_NUMBER"),
-        to=sender,
-        body=resposta_ia
-    )
-
+# Webhook principal
 @app.route('/bot', methods=['POST'])
 def whatsapp_reply():
-    print("🛠 CHEGOU ALGO NO /bot")
-    raise Exception("Forçando erro para teste")
+    print("📩 Requisição recebida no /bot — resposta imediata")
 
+    sender = request.form.get('From')
+    incoming_msg = request.form.get('Body', '').strip()
+    num_media = int(request.form.get('NumMedia', 0))
+
+    threading.Thread(target=processar_em_background, args=(sender, incoming_msg, num_media, request.form)).start()
+
+    resposta = MessagingResponse()
+    resposta.message("Recebi sua imagem! Estou analisando e te respondo em instantes.")
+    return Response(str(resposta), mimetype='text/xml')
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

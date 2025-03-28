@@ -7,8 +7,8 @@ from twilio.rest import Client as TwilioClient
 
 app = Flask(__name__)
 
-# Configura o cliente OpenAI
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Configura o cliente OpenAI corretamente
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Configura o cliente Twilio
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
@@ -26,7 +26,7 @@ user_threads = {}
 FORWARD_TO_NUMBER = "+5598991472030"
 TWILIO_NUMBER = "+19523146907"
 
-@app.route('/whatsapp', methods=['POST'])
+@app.route('/bot', methods=['POST'])
 def whatsapp_reply():
     sender = request.form.get('From')
     incoming_msg = request.form.get('Body', '').strip()
@@ -41,20 +41,20 @@ def whatsapp_reply():
 
     # Cria nova thread caso o usuário ainda não tenha uma
     if sender not in user_threads:
-        thread = client.beta.threads.create()
+        thread = openai_client.beta.threads.create()
         user_threads[sender] = thread.id
 
     thread_id = user_threads[sender]
 
     # Adiciona a mensagem do usuário à thread
-    client.beta.threads.messages.create(
+    openai_client.beta.threads.messages.create(
         thread_id=thread_id,
         role="user",
         content=incoming_msg
     )
 
     # Executa o assistente
-    run = client.beta.threads.runs.create(
+    run = openai_client.beta.threads.runs.create(
         thread_id=thread_id,
         assistant_id=ASSISTANT_ID
     )
@@ -62,10 +62,10 @@ def whatsapp_reply():
     # Aguarda resposta do assistente
     while run.status != "completed":
         time.sleep(1)
-        run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+        run = openai_client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
 
     # Obtém a resposta mais recente, com verificação segura
-    messages = client.beta.threads.messages.list(thread_id=thread_id)
+    messages = openai_client.beta.threads.messages.list(thread_id=thread_id)
 
     if messages.data:
         resposta_ia = messages.data[0].content[0].text.value.strip()

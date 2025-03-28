@@ -65,9 +65,13 @@ def extrair_texto_excel(conteudo):
 # Processamento em segundo plano
 def processar_em_background(sender, incoming_msg, num_media, request_form):
     try:
+        print("🔧 Iniciando processamento em background")
+
         if 'g.us' in sender:
+            print("⚠️ Mensagem de grupo ignorada.")
             return
 
+        print("📝 Salvando contato no Google Sheets...")
         agora = time.time()
         ultima_interacao[sender] = agora
 
@@ -81,6 +85,7 @@ def processar_em_background(sender, incoming_msg, num_media, request_form):
         thread_id = user_threads[sender]
 
         if num_media > 0:
+            print("📥 Baixando e processando mídia recebida...")
             media_url = request_form.get('MediaUrl0')
             content_type = request_form.get('MediaContentType0')
 
@@ -107,18 +112,21 @@ def processar_em_background(sender, incoming_msg, num_media, request_form):
             else:
                 content = "Recebemos a mídia, mas não conseguimos processá-la."
 
+            print("📤 Enviando mensagem com conteúdo para OpenAI...")
             client.beta.threads.messages.create(
                 thread_id=thread_id,
                 role="user",
                 content=content
             )
         else:
+            print("🗨️ Enviando mensagem de texto simples para OpenAI...")
             client.beta.threads.messages.create(
                 thread_id=thread_id,
                 role="user",
                 content=incoming_msg
             )
 
+        print("⏳ Aguardando resposta do Assistente...")
         run = client.beta.threads.runs.create(thread_id=thread_id, assistant_id=ASSISTANT_ID)
 
         while run.status != "completed":
@@ -131,7 +139,7 @@ def processar_em_background(sender, incoming_msg, num_media, request_form):
         else:
             resposta_ia = "Desculpe, não consegui gerar uma resposta."
 
-        # Envia a resposta final via Twilio
+        print("✅ Enviando resposta final ao usuário no WhatsApp...")
         twilio_client.messages.create(
             from_="whatsapp:" + os.getenv("TWILIO_PHONE_NUMBER"),
             to=sender,
@@ -150,7 +158,11 @@ def whatsapp_reply():
     incoming_msg = request.form.get('Body', '').strip()
     num_media = int(request.form.get('NumMedia', 0))
 
-    threading.Thread(target=processar_em_background, args=(sender, incoming_msg, num_media, request.form)).start()
+    # Processamento em segundo plano
+    threading.Thread(
+        target=processar_em_background,
+        args=(sender, incoming_msg, num_media, request.form)
+    ).start()
 
     resposta = MessagingResponse()
     resposta.message("Recebi sua imagem! Estou analisando e te respondo em instantes.")

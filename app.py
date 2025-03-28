@@ -6,23 +6,20 @@ import os
 from twilio.rest import Client as TwilioClient
 import requests
 from io import BytesIO
-import fitz  # PyMuPDF para PDFs
+import fitz
 from docx import Document
 import openpyxl
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-import threading
 
 app = Flask(__name__)
 
-# OpenAI
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     default_headers={"OpenAI-Beta": "assistants=v2"}
 )
 
-# Twilio
 twilio_client = TwilioClient(
     os.getenv("TWILIO_ACCOUNT_SID"),
     os.getenv("TWILIO_AUTH_TOKEN")
@@ -32,7 +29,6 @@ ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 ultima_interacao = {}
 user_threads = {}
 
-# Google Sheets
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -41,7 +37,6 @@ creds = Credentials.from_service_account_file('credentials.json', scopes=scope)
 gclient = gspread.authorize(creds)
 sheet = gclient.open("Contatos WhatsApp Camila I.A").sheet1
 
-# Funções auxiliares
 def extrair_texto_pdf(conteudo):
     pdf_documento = fitz.open(stream=conteudo, filetype="pdf")
     texto = ""
@@ -62,7 +57,6 @@ def extrair_texto_excel(conteudo):
         texto += ' '.join(linha) + '\n'
     return texto.strip()
 
-# Processamento em segundo plano
 def processar_em_background(sender, incoming_msg, num_media, request_form):
     try:
         print("🔧 Iniciando processamento em background")
@@ -150,7 +144,7 @@ def processar_em_background(sender, incoming_msg, num_media, request_form):
         )
 
     except Exception as e:
-        print("❌ Erro no processamento em background:", e)
+        print("❌ Erro no processamento:", e)
 
 @app.route('/bot', methods=['POST'])
 def whatsapp_reply():
@@ -160,10 +154,8 @@ def whatsapp_reply():
     incoming_msg = request.form.get('Body', '').strip()
     num_media = int(request.form.get('NumMedia', 0))
 
-    threading.Thread(
-        target=processar_em_background,
-        args=(sender, incoming_msg, num_media, request.form)
-    ).start()
+    # CHAMADA DIRETA (sem thread)
+    processar_em_background(sender, incoming_msg, num_media, request.form)
 
     resposta = MessagingResponse()
     resposta.message("Recebi sua imagem! Estou analisando e te respondo em instantes.")

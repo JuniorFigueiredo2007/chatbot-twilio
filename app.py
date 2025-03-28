@@ -3,35 +3,49 @@ from twilio.twiml.messaging_response import MessagingResponse
 from openai import OpenAI
 import time
 import os
-import requests
 from twilio.rest import Client as TwilioClient
+import pytesseract
+from PIL import Image
+import requests
+from io import BytesIO
 
 app = Flask(__name__)
 
-# Configuração correta com suporte a Assistants API v2
+# Clientes OpenAI e Twilio configurados corretamente
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     default_headers={"OpenAI-Beta": "assistants=v2"}
 )
 
-# Cliente Twilio
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+twilio_client = TwilioClient(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
 
+# ID do Assistente Camila
 ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 
-ultima_interacao = {}
+# Dicionários para threads e última interação
 user_threads = {}
+ultima_interacao = {}
 
 @app.route('/bot', methods=['POST'])
 def whatsapp_reply():
     sender = request.form.get('From')
     incoming_msg = request.form.get('Body', '').strip()
+    num_media = int(request.form.get('NumMedia', 0))
 
-    # Ignora grupos
     if 'g.us' in sender:
         return ''
+
+    # Simulando digitação humana (pequena pausa)
+    time.sleep(2)
+
+    if num_media > 0:
+        media_url = request.form.get('MediaUrl0')
+        media_type = request.form.get('MediaContentType0')
+
+        if 'image' in media_type:
+            response = requests.get(media_url)
+            img = Image.open(BytesIO(response.content))
+            incoming_msg = pytesseract.image_to_string(img).strip()
 
     agora = time.time()
     ultima_interacao[sender] = agora
@@ -41,24 +55,6 @@ def whatsapp_reply():
         user_threads[sender] = thread.id
 
     thread_id = user_threads[sender]
-
-    # Verifica se a mensagem tem mídia (áudio) e faz transcrição
-    if int(request.form.get('NumMedia', 0)) > 0:
-        media_url = request.form.get('MediaUrl0')
-        media_content_type = request.form.get('MediaContentType0')
-
-        if 'audio' in media_content_type:
-            audio_file = requests.get(media_url)
-            audio_filename = f'/tmp/{sender.replace("+", "")}.ogg'
-            with open(audio_filename, 'wb') as f:
-                f.write(audio_file.content)
-
-            with open(audio_filename, 'rb') as f:
-                transcription = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=f
-                )
-            incoming_msg = transcription.text
 
     client.beta.threads.messages.create(
         thread_id=thread_id,
@@ -81,10 +77,6 @@ def whatsapp_reply():
         resposta_ia = messages.data[0].content[0].text.value.strip()
     else:
         resposta_ia = "Desculpe, não consegui gerar uma resposta. Por favor, tente novamente."
-
-    # Simulando que a Camila está digitando por alguns segundos antes de responder
-    tempo_digitando = min(len(resposta_ia) * 0.05, 5)  # máximo 5 segundos
-    time.sleep(tempo_digitando)
 
     resp = MessagingResponse()
     msg = resp.message()

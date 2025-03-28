@@ -6,11 +6,9 @@ import os
 from twilio.rest import Client as TwilioClient
 import requests
 from io import BytesIO
-from PIL import Image
 import fitz  # PyMuPDF para PDFs
 from docx import Document  # Para Word
 import openpyxl  # Para Excel
-import pytesseract
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
@@ -33,7 +31,7 @@ ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 ultima_interacao = {}
 user_threads = {}
 
-# Configuração correta Google Sheets
+# Configuração Google Sheets
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 creds = Credentials.from_service_account_file('credentials.json', scopes=scope)
 gclient = gspread.authorize(creds)
@@ -92,9 +90,7 @@ def whatsapp_reply():
         )
 
         if 'image' in content_type:
-            img = Image.open(BytesIO(response.content))
-            texto_extraido = pytesseract.image_to_string(img)
-            incoming_msg = f"O cliente enviou uma imagem com o seguinte texto: {texto_extraido}"
+            incoming_msg = "O cliente enviou uma imagem (OCR pela OpenAI ativado automaticamente)."
 
         elif 'pdf' in content_type:
             texto_extraido = extrair_texto_pdf(response.content)

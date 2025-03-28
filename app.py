@@ -66,6 +66,9 @@ def extrair_texto_excel(conteudo):
 def processar_em_background(sender, incoming_msg, num_media, request_form):
     try:
         print("🔧 Iniciando processamento em background")
+        print("📨 Mensagem recebida de:", sender)
+        print("📎 Texto:", incoming_msg)
+        print("📷 Número de mídias:", num_media)
 
         if 'g.us' in sender:
             print("⚠️ Mensagem de grupo ignorada.")
@@ -139,7 +142,7 @@ def processar_em_background(sender, incoming_msg, num_media, request_form):
         else:
             resposta_ia = "Desculpe, não consegui gerar uma resposta."
 
-        print("✅ Enviando resposta final ao usuário no WhatsApp...")
+        print("✅ Enviando resposta final ao WhatsApp...")
         twilio_client.messages.create(
             from_="whatsapp:" + os.getenv("TWILIO_PHONE_NUMBER"),
             to=sender,
@@ -149,7 +152,6 @@ def processar_em_background(sender, incoming_msg, num_media, request_form):
     except Exception as e:
         print("❌ Erro no processamento em background:", e)
 
-# Webhook principal
 @app.route('/bot', methods=['POST'])
 def whatsapp_reply():
     print("📩 Requisição recebida no /bot — resposta imediata")
@@ -158,7 +160,6 @@ def whatsapp_reply():
     incoming_msg = request.form.get('Body', '').strip()
     num_media = int(request.form.get('NumMedia', 0))
 
-    # Processamento em segundo plano
     threading.Thread(
         target=processar_em_background,
         args=(sender, incoming_msg, num_media, request.form)

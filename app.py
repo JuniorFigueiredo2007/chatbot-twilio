@@ -7,25 +7,25 @@ from twilio.rest import Client as TwilioClient
 
 app = Flask(__name__)
 
-# Cliente OpenAI configurado corretamente com suporte ao Assistants API v2
+# Configura corretamente o cliente OpenAI com suporte à API v2
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     default_headers={"OpenAI-Beta": "assistants=v2"}
 )
 
-# Configura o cliente Twilio
+# Configuração do cliente Twilio
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
-# ID atualizado do Assistente (Camila)
+# ID correto do Assistente (Camila)
 ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 
-# Dicionários para rastrear última interação e threads por usuário
+# Dicionários para rastrear interações e threads por usuário
 ultima_interacao = {}
 user_threads = {}
 
-# Número para encaminhar SMS (seu número pessoal)
+# Número pessoal para encaminhar SMS
 FORWARD_TO_NUMBER = "+5598991472030"
 TWILIO_NUMBER = "+19523146907"
 

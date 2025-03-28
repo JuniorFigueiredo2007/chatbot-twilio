@@ -10,6 +10,10 @@ from PIL import Image
 import fitz  # PyMuPDF para PDFs
 from docx import Document  # Para Word
 import openpyxl  # Para Excel
+import pytesseract
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -28,6 +32,12 @@ ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 
 ultima_interacao = {}
 user_threads = {}
+
+# Configuração correta Google Sheets
+scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+creds = Credentials.from_service_account_file('credentials.json', scopes=scope)
+gclient = gspread.authorize(creds)
+sheet = gclient.open("Contatos_Camila").sheet1
 
 def extrair_texto_pdf(conteudo):
     pdf_documento = fitz.open(stream=conteudo, filetype="pdf")
@@ -60,6 +70,11 @@ def whatsapp_reply():
 
     agora = time.time()
     ultima_interacao[sender] = agora
+
+    # Gravação de contato no Google Sheets
+    contatos_existentes = sheet.col_values(1)
+    if sender not in contatos_existentes:
+        sheet.append_row([sender, datetime.now().strftime("%d/%m/%Y %H:%M:%S")])
 
     if sender not in user_threads:
         thread = client.beta.threads.create()

@@ -15,7 +15,6 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Clientes
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     default_headers={"OpenAI-Beta": "assistants=v2"}
@@ -31,7 +30,6 @@ ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 ultima_interacao = {}
 user_threads = {}
 
-# Configuração Google Sheets
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 creds = Credentials.from_service_account_file('credentials.json', scopes=scope)
 gclient = gspread.authorize(creds)
@@ -69,7 +67,6 @@ def whatsapp_reply():
     agora = time.time()
     ultima_interacao[sender] = agora
 
-    # Gravação de contato no Google Sheets
     contatos_existentes = sheet.col_values(1)
     if sender not in contatos_existentes:
         sheet.append_row([sender, datetime.now().strftime("%d/%m/%Y %H:%M:%S")])
@@ -85,30 +82,61 @@ def whatsapp_reply():
         content_type = request.form.get('MediaContentType0')
 
         response = requests.get(media_url, auth=(
-            os.getenv("TWILIO_ACCOUNT_SID"), 
+            os.getenv("TWILIO_ACCOUNT_SID"),
             os.getenv("TWILIO_AUTH_TOKEN"))
         )
 
+        conteudo = response.content
+
         if 'image' in content_type:
-            incoming_msg = "O cliente enviou uma imagem (OCR pela OpenAI ativado automaticamente)."
-
+            incoming_msg = "O cliente enviou uma imagem (análise com GPT-4 Vision)."
+            base64_img = media_url
+            client.beta.threads.messages.create(
+                thread_id=thread_id,
+                role="user",
+                content=[
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": base64_img
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": "Descreva o conteúdo dessa imagem, por favor."
+                    }
+                ]
+            )
         elif 'pdf' in content_type:
-            texto_extraido = extrair_texto_pdf(response.content)
+            texto_extraido = extrair_texto_pdf(conteudo)
             incoming_msg = f"O cliente enviou um PDF com o seguinte texto: {texto_extraido}"
-
+            client.beta.threads.messages.create(
+                thread_id=thread_id,
+                role="user",
+                content=incoming_msg
+            )
         elif 'msword' in content_type or 'wordprocessingml' in content_type:
-            texto_extraido = extrair_texto_word(response.content)
+            texto_extraido = extrair_texto_word(conteudo)
             incoming_msg = f"O cliente enviou um documento Word com o seguinte texto: {texto_extraido}"
-
+            client.beta.threads.messages.create(
+                thread_id=thread_id,
+                role="user",
+                content=incoming_msg
+            )
         elif 'sheet' in content_type or 'spreadsheetml' in content_type:
-            texto_extraido = extrair_texto_excel(response.content)
+            texto_extraido = extrair_texto_excel(conteudo)
             incoming_msg = f"O cliente enviou um Excel com o seguinte texto: {texto_extraido}"
-
-    client.beta.threads.messages.create(
-        thread_id=thread_id,
-        role="user",
-        content=incoming_msg
-    )
+            client.beta.threads.messages.create(
+                thread_id=thread_id,
+                role="user",
+                content=incoming_msg
+            )
+    else:
+        client.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content=incoming_msg
+        )
 
     run = client.beta.threads.runs.create(
         thread_id=thread_id,

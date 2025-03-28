@@ -7,32 +7,30 @@ from twilio.rest import Client as TwilioClient
 
 app = Flask(__name__)
 
-# Cliente OpenAI correto
+# Configura o cliente OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Cliente Twilio correto
+# Configura o cliente Twilio
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
-# ID do Assistente Camila
+# ID atualizado do Assistente (Camila)
 ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
 
-# Dicionários para rastrear interações
+# Dicionários para rastrear última interação e threads por usuário
 ultima_interacao = {}
 user_threads = {}
 
-# Número pessoal para encaminhar SMS
+# Número para encaminhar SMS (seu número pessoal)
 FORWARD_TO_NUMBER = "+5598991472030"
 TWILIO_NUMBER = "+19523146907"
 
-# ROTA WHATSAPP CORRETA
-@app.route('/bot', methods=['POST'])
+@app.route('/bot', methods=['POST']) # <== Esta linha corrigida agora corretamente.
 def whatsapp_reply():
     sender = request.form.get('From')
     incoming_msg = request.form.get('Body', '').strip()
 
-    # Ignora grupos
     if 'g.us' in sender:
         return ''
 
@@ -73,7 +71,6 @@ def whatsapp_reply():
 
     return str(resp)
 
-# ROTA SMS CORRETA
 @app.route('/sms', methods=['POST'])
 def sms_forward():
     sender = request.form.get('From')
@@ -90,3 +87,4 @@ def sms_forward():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+

@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, Response
 from twilio.twiml.messaging_response import MessagingResponse
 from openai import OpenAI
 import time
@@ -63,115 +63,15 @@ def extrair_texto_excel(conteudo):
 
 @app.route('/bot', methods=['POST'])
 def whatsapp_reply():
-    print("📩 Requisição recebida no /bot")
-    print("Form:", request.form)
-    print("Headers:", request.headers)
+    print("📩 Requisição recebida no /bot — retorno rápido")
 
-    sender = request.form.get('From')
-    incoming_msg = request.form.get('Body', '').strip()
-    num_media = int(request.form.get('NumMedia', 0))
+    # ✅ Passo 1: resposta imediata para evitar erro 502/11200
+    resposta_xml = "<?xml version='1.0' encoding='UTF-8'?><Response></Response>"
+    return Response(resposta_xml, mimetype='text/xml')
 
-    print("Número de mídias recebidas:", num_media)
-    if num_media > 0:
-        print("Media URL:", request.form.get('MediaUrl0'))
-        print("Tipo de mídia:", request.form.get('MediaContentType0'))
-
-    if 'g.us' in sender:
-        return ''
-
-    agora = time.time()
-    ultima_interacao[sender] = agora
-
-    # Salva no Google Sheets se for novo
-    contatos_existentes = sheet.col_values(1)
-    if sender not in contatos_existentes:
-        sheet.append_row([sender, datetime.now().strftime("%d/%m/%Y %H:%M:%S")])
-
-    if sender not in user_threads:
-        thread = client.beta.threads.create()
-        user_threads[sender] = thread.id
-
-    thread_id = user_threads[sender]
-
-    if num_media > 0:
-        media_url = request.form.get('MediaUrl0')
-        content_type = request.form.get('MediaContentType0')
-
-        response = requests.get(media_url, auth=(
-            os.getenv("TWILIO_ACCOUNT_SID"),
-            os.getenv("TWILIO_AUTH_TOKEN"))
-        )
-        conteudo = response.content
-
-        if 'image' in content_type:
-            client.beta.threads.messages.create(
-                thread_id=thread_id,
-                role="user",
-                content=[
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": media_url + ".jpg"
-                        }
-                    },
-                    {
-                        "type": "text",
-                        "text": incoming_msg or "Descreva o conteúdo dessa imagem, por favor."
-                    }
-                ]
-            )
-        elif 'pdf' in content_type:
-            texto_extraido = extrair_texto_pdf(conteudo)
-            incoming_msg = f"O cliente enviou um PDF com o seguinte texto: {texto_extraido}"
-            client.beta.threads.messages.create(
-                thread_id=thread_id,
-                role="user",
-                content=incoming_msg
-            )
-        elif 'msword' in content_type or 'wordprocessingml' in content_type:
-            texto_extraido = extrair_texto_word(conteudo)
-            incoming_msg = f"O cliente enviou um documento Word com o seguinte texto: {texto_extraido}"
-            client.beta.threads.messages.create(
-                thread_id=thread_id,
-                role="user",
-                content=incoming_msg
-            )
-        elif 'sheet' in content_type or 'spreadsheetml' in content_type:
-            texto_extraido = extrair_texto_excel(conteudo)
-            incoming_msg = f"O cliente enviou um Excel com o seguinte texto: {texto_extraido}"
-            client.beta.threads.messages.create(
-                thread_id=thread_id,
-                role="user",
-                content=incoming_msg
-            )
-    else:
-        client.beta.threads.messages.create(
-            thread_id=thread_id,
-            role="user",
-            content=incoming_msg
-        )
-
-    run = client.beta.threads.runs.create(
-        thread_id=thread_id,
-        assistant_id=ASSISTANT_ID
-    )
-
-    while run.status != "completed":
-        time.sleep(1)
-        run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
-
-    messages = client.beta.threads.messages.list(thread_id=thread_id)
-
-    if messages.data:
-        resposta_ia = messages.data[0].content[0].text.value.strip()
-    else:
-        resposta_ia = "Desculpe, não consegui gerar uma resposta. Por favor, tente novamente."
-
-    resp = MessagingResponse()
-    msg = resp.message()
-    msg.body(resposta_ia)
-
-    return str(resp)
+    # ⛔️ O restante do processamento com OpenAI, mídia, planilhas etc
+    # será feito no próximo passo, fora dessa função ou em background
+    # (Aqui, temporariamente, ele está sendo interrompido)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

@@ -107,7 +107,7 @@ def whatsapp_reply():
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": media_url
+                            "url": media_url + ".jpg"
                         }
                     },
                     {

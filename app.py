@@ -27,10 +27,7 @@ twilio_client = TwilioClient(
     os.getenv("TWILIO_AUTH_TOKEN")
 )
 
-# ID do Assistente OpenAI
 ASSISTANT_ID = "asst_mlwRF5Byw4b4gqlYz9jvJtwV"
-
-# Variáveis de controle
 ultima_interacao = {}
 user_threads = {}
 
@@ -43,7 +40,7 @@ creds = Credentials.from_service_account_file('credentials.json', scopes=scope)
 gclient = gspread.authorize(creds)
 sheet = gclient.open("Contatos WhatsApp Camila I.A").sheet1
 
-# Funções auxiliares para extrair texto
+# Funções auxiliares
 def extrair_texto_pdf(conteudo):
     pdf_documento = fitz.open(stream=conteudo, filetype="pdf")
     texto = ""
@@ -69,15 +66,15 @@ def whatsapp_reply():
     print("📩 Requisição recebida no /bot")
     print("Form:", request.form)
     print("Headers:", request.headers)
-    
+
     sender = request.form.get('From')
     incoming_msg = request.form.get('Body', '').strip()
     num_media = int(request.form.get('NumMedia', 0))
-    print("Número de mídias recebidas:", num_media)
-if num_media > 0:
-    print("Media URL:", request.form.get('MediaUrl0'))
-    print("Tipo de mídia:", request.form.get('MediaContentType0'))
 
+    print("Número de mídias recebidas:", num_media)
+    if num_media > 0:
+        print("Media URL:", request.form.get('MediaUrl0'))
+        print("Tipo de mídia:", request.form.get('MediaContentType0'))
 
     if 'g.us' in sender:
         return ''
@@ -90,14 +87,12 @@ if num_media > 0:
     if sender not in contatos_existentes:
         sheet.append_row([sender, datetime.now().strftime("%d/%m/%Y %H:%M:%S")])
 
-    # Cria thread do usuário se não existir
     if sender not in user_threads:
         thread = client.beta.threads.create()
         user_threads[sender] = thread.id
 
     thread_id = user_threads[sender]
 
-    # Se houver mídia anexada
     if num_media > 0:
         media_url = request.form.get('MediaUrl0')
         content_type = request.form.get('MediaContentType0')
@@ -150,14 +145,12 @@ if num_media > 0:
                 content=incoming_msg
             )
     else:
-        # Mensagem de texto normal
         client.beta.threads.messages.create(
             thread_id=thread_id,
             role="user",
             content=incoming_msg
         )
 
-    # Executa a IA e espera a resposta
     run = client.beta.threads.runs.create(
         thread_id=thread_id,
         assistant_id=ASSISTANT_ID
@@ -174,7 +167,6 @@ if num_media > 0:
     else:
         resposta_ia = "Desculpe, não consegui gerar uma resposta. Por favor, tente novamente."
 
-    # Envia a resposta para o WhatsApp
     resp = MessagingResponse()
     msg = resp.message()
     msg.body(resposta_ia)

@@ -112,7 +112,7 @@ def whatsapp_reply():
                     },
                     {
                         "type": "text",
-                        "text": "Descreva o conteúdo dessa imagem, por favor."
+                        "text": incoming_msg or "Descreva o conteúdo dessa imagem, por favor."
                     }
                 ]
             )

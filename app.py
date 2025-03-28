@@ -33,7 +33,8 @@ user_threads = {}
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 creds = Credentials.from_service_account_file('credentials.json', scopes=scope)
 gclient = gspread.authorize(creds)
-sheet = gclient.open("Contatos_Camila").sheet1
+sheet = gclient.open("Contatos WhatsApp Camila I.A").sheet1
+
 
 def extrair_texto_pdf(conteudo):
     pdf_documento = fitz.open(stream=conteudo, filetype="pdf")

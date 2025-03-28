@@ -66,6 +66,10 @@ def extrair_texto_excel(conteudo):
 
 @app.route('/bot', methods=['POST'])
 def whatsapp_reply():
+    print("📩 Requisição recebida no /bot")
+    print("Form:", request.form)
+    print("Headers:", request.headers)
+    
     sender = request.form.get('From')
     incoming_msg = request.form.get('Body', '').strip()
     num_media = int(request.form.get('NumMedia', 0))

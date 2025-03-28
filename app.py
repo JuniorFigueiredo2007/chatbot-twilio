@@ -1,14 +1,14 @@
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 from openai import OpenAI
-import requests
-import os
 import time
+import os
+import requests
 from twilio.rest import Client as TwilioClient
 
 app = Flask(__name__)
 
-# Configuração do OpenAI Client com suporte à Assistants API v2
+# Configuração correta com suporte a Assistants API v2
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     default_headers={"OpenAI-Beta": "assistants=v2"}
@@ -28,38 +28,37 @@ user_threads = {}
 def whatsapp_reply():
     sender = request.form.get('From')
     incoming_msg = request.form.get('Body', '').strip()
-    num_media = int(request.form.get('NumMedia', 0))
 
+    # Ignora grupos
     if 'g.us' in sender:
         return ''
 
     agora = time.time()
     ultima_interacao[sender] = agora
 
-    # Transcrição do áudio (se houver)
-    if num_media > 0:
-        media_type = request.form.get('MediaContentType0')
-        if 'audio' in media_type or 'ogg' in media_type:
-            audio_url = request.form.get('MediaUrl0')
-            audio_file = requests.get(audio_url, auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN))
-
-            with open('/tmp/audio.mp3', 'wb') as f:
-                f.write(audio_file.content)
-
-            # Usando Whisper da OpenAI
-            with open('/tmp/audio.mp3', 'rb') as audio:
-                transcript = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio,
-                    response_format='text'
-                )
-                incoming_msg = transcript.strip()
-
     if sender not in user_threads:
         thread = client.beta.threads.create()
         user_threads[sender] = thread.id
 
     thread_id = user_threads[sender]
+
+    # Verifica se a mensagem tem mídia (áudio) e faz transcrição
+    if int(request.form.get('NumMedia', 0)) > 0:
+        media_url = request.form.get('MediaUrl0')
+        media_content_type = request.form.get('MediaContentType0')
+
+        if 'audio' in media_content_type:
+            audio_file = requests.get(media_url)
+            audio_filename = f'/tmp/{sender.replace("+", "")}.ogg'
+            with open(audio_filename, 'wb') as f:
+                f.write(audio_file.content)
+
+            with open(audio_filename, 'rb') as f:
+                transcription = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=f
+                )
+            incoming_msg = transcription.text
 
     client.beta.threads.messages.create(
         thread_id=thread_id,
@@ -83,24 +82,14 @@ def whatsapp_reply():
     else:
         resposta_ia = "Desculpe, não consegui gerar uma resposta. Por favor, tente novamente."
 
+    # Simulando que a Camila está digitando por alguns segundos antes de responder
+    tempo_digitando = min(len(resposta_ia) * 0.05, 5)  # máximo 5 segundos
+    time.sleep(tempo_digitando)
+
     resp = MessagingResponse()
     msg = resp.message()
     msg.body(resposta_ia)
 
-    return str(resp)
-
-@app.route('/sms', methods=['POST'])
-def sms_forward():
-    sender = request.form.get('From')
-    message_body = request.form.get('Body', '').strip()
-
-    twilio_client.messages.create(
-        body=f"SMS de {sender}: {message_body}",
-        from_=os.getenv("TWILIO_NUMBER"),
-        to=os.getenv("FORWARD_TO_NUMBER")
-    )
-
-    resp = MessagingResponse()
     return str(resp)
 
 if __name__ == "__main__":

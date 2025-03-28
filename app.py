@@ -73,6 +73,11 @@ def whatsapp_reply():
     sender = request.form.get('From')
     incoming_msg = request.form.get('Body', '').strip()
     num_media = int(request.form.get('NumMedia', 0))
+    print("Número de mídias recebidas:", num_media)
+if num_media > 0:
+    print("Media URL:", request.form.get('MediaUrl0'))
+    print("Tipo de mídia:", request.form.get('MediaContentType0'))
+
 
     if 'g.us' in sender:
         return ''
